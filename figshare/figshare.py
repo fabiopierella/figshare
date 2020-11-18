@@ -1,8 +1,12 @@
+import ipdb
 import json
 import requests
 from requests.exceptions import HTTPError
 import os
-from urllib.request import urlretrieve
+# from urllib.request import urlretrieve
+from multiprocessing.dummy import Pool
+from itertools import zip_longest
+from resumable import urlretrieve
 
 def issue_request(method, url, headers, data=None, binary=False):
     """Wrapper for HTTP request
@@ -318,5 +322,27 @@ class Figshare:
         dir0 = os.path.join(directory, "figshare_{0}/".format(article_id))
         os.makedirs(dir0, exist_ok=True) # This might require Python >=3.2
 
-        for file_dict in file_list:
-            urlretrieve(file_dict['download_url'], os.path.join(dir0, file_dict['name']))
+        # Serial file download
+        # for file_dict in file_list:
+        #     urlretrieve(file_dict['download_url'], os.path.join(dir0, file_dict['name']))
+
+
+        # Attempting a parallel implementation
+        def grouper(n, iterable, fillvalue=None):
+            "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+            args = [iter(iterable)] * n
+            return zip_longest(fillvalue=fillvalue, *args)
+
+        def retrieve(file_dict):
+            success = False
+            while success is False:
+                try:
+                    urlretrieve(file_dict['download_url'], os.path.join(dir0, file_dict['name']))
+                    success = True
+                except Exception as e:
+                    print(e)
+                    pass
+        
+        for a,b,c,d in grouper(4, file_list):
+            result = Pool(4).map(retrieve, [a,b,c,d]) # download 4 files at a time
+
